@@ -1,0 +1,51 @@
+You can experiement with this using entirely free software.
+
+You need the following trees:
+
+https://github.com/SudhakarKuppusamy1/qemu branch sbat
+https://github.com/SudhakarKuppusamy1/SLOF branch sbat
+https://github.com/SudhakarKuppusamy1/grub branch sbat
+
+You also need:
+ - the SBAT metadata (.csv file)
+ - the SBAT Variable (.csv file)
+Both should followed the SBAT specification (https://github.com/rhboot/shim/blob/main/SBAT.md)
+
+Example: https://github.com/SudhakarKuppusamy1/testing/sbat
+   
+   sbat_metadata.csv
+   sbat_var.csv 
+
+Lastly you will need a working a ppc64(le) vm.
+
+sample vm: https://github.com/SudhakarKuppusamy1/testing/vm
+
+   pseries-ubuntu-20.04.6.qcow2
+
+Then:
+
+ - build qemu (./configure --target-list=ppc64-softmmu && make). You need qemu-system-ppc64.
+
+ - use xxd (ex: xxd -i sbat_var.csv sbat_var.h) to convert the SBAT Variable for verifying grub into a header
+   file, and copy it in to SLOF/lib/libcrypto/sbat_var.h. It must
+   create variables sbat_var_csv and sbat_var_csv_len.
+
+ - build SLOF for qemu (make qemu)
+
+ - verify that you can boot your VM with new SLOF and stock grub.
+
+   To boot with new SLOF, pass -bios ./SLOF/boot_rom.bin . It should
+   boot with new slof in secure boot mode.
+
+   sudo ./build/qemu-system-ppc64 -m 8192 -M pseries-2.12,accel=kvm,cap-ail-mode-3=off,secure-boot=on -nographic -vga none -smp 4 -hdd pseries-ubuntu-20.04.6.qcow2 -bios ./boot_rom.bin
+
+ - Build grub in your VM.
+
+ - Build the SBAT metadata into grub.The following incantation should give you a working but
+   non-portable grub, assuming you have grub installed on /dev/sda2:
+
+   GRUB_MODULES="all_video boot btrfs cat configfile echo ext2 fat font gfxmenu gfxterm gzio halt hfsplus http iso9660 jpeg loadenv loopback linux lvm mdraid09 mdraid1x minicmd net normal part_apple part_msdos part_gpt password_pbkdf2 png reboot regexp search search_fs_uuid search_fs_file search_label serial sleep syslinuxcfg test tftp video xfs"
+
+   sudo ./grub-install --modules "$GRUB_MODULES" -d ./grub-core/ -v "/dev/sda2" --sbat=./sbat_metadata.csv
+   dd if=/boot/grub/powerpc-ieee1275/core.elf of=/dev/sda2
+ 
